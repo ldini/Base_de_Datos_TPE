@@ -52,6 +52,42 @@ INSERT INTO "g29_moneda" (moneda,nombre,descripcion,alta,estado,fiat)
   ('ARS','Peso Argentino','none','03-02-2020','N','Y');
 
 
+-- EL USUARIO DEBE TENER UNA BILLETERA POR CADA MONEDA EXISTENTE
+CREATE OR REPLACE FUNCTION G29_FN_Insertar_Nueva_Billetera() returns void as $$
+declare
+     i integer;
+ begin
+     i := 1;
+     loop
+         exit when i = 101;
+         insert into g29_billetera(mercado, id_usuario, tipo, fecha_creacion, fecha_ejec, valor, cantidad, estado) VALUES
+
+         i := i + 1;
+     end loop;
+ end;
+ $$ language plpgsql;
+
+
+CREATE OR REPLACE FUNCTION TRFN_G29_Nueva_Billetera()
+RETURNS trigger AS
+$$
+BEGIN
+	IF (NOT EXISTS (SELECT 1
+			FROM g29_moneda m
+			WHERE m.moneda = NEW.moneda))
+    END IF;
+RETURN NEW;
+END
+$$
+LANGUAGE plpgsql;
+
+CREATE TRIGGER TR_G29_Nueva_Billetera
+BEFORE INSERT ON g29_moneda
+FOR EACH ROW
+EXECUTE PROCEDURE G29_FN_Insertar_Nueva_Billetera();
+
+
+
 INSERT INTO "g29_mercado" (nombre,moneda_o,moneda_d,precio_mercado)
 VALUES ('Mercado 1','USDT','BTC',826047.54),
        ('Mercado 2','USDT','ETH',297.15),
@@ -121,77 +157,74 @@ VALUES ('Mercado 51','BTC','BTC',826047.54),
 
 
 
---PROCEDIMIENTOS NECESARIOS PARA AUTO CARGAR ORDENES
---
--- CREATE OR REPLACE FUNCTION G29_FN_FECHAS_RANDOM(desde timestamp, hasta timestamp) returns timestamp as $$
--- BEGIN
---     RETURN desde + random() * (hasta - desde);
--- END;
--- $$ language plpgsql;
---
--- CREATE OR REPLACE FUNCTION G29_FN_MONEDA_RANDOM() returns varchar as $$
--- BEGIN
---     RETURN (SELECT nombre FROM g29_moneda OFFSET floor(random()*(SELECT count(*) FROM g29_moneda )) LIMIT 1);
--- END;
--- $$ language plpgsql;
---
--- CREATE OR REPLACE FUNCTION G29_FN_MERCADO_RANDOM() returns varchar as $$
--- BEGIN
---     RETURN (SELECT nombre FROM g29_mercado OFFSET floor(random()*(SELECT count(*) FROM g29_mercado )) LIMIT 1);
--- END;
--- $$ language plpgsql;
---
--- CREATE OR REPLACE FUNCTION G29_FN_USUARIO_RANDOM() returns int as $$
--- BEGIN
---     RETURN (SELECT id_usuario FROM g29_usuario OFFSET floor(random()*(SELECT count(*) FROM g29_usuario)) LIMIT 1);
--- END;
--- $$ language plpgsql;
---
--- CREATE OR REPLACE FUNCTION G29_FN_TIPO_RANDOM() returns varchar as $$
--- DECLARE
---     tipo varchar;
--- BEGIN
---     IF (SELECT ROUND(RANDOM() * 1) = 1) THEN
---         tipo = 'VENTA';
---     ELSE
---         tipo = 'COMPRA';
---     END IF;
---     RETURN tipo;
--- END;
--- $$ language plpgsql;
---
--- --ESTE PROCEDIMIENTO CREA 100 FILAS EN LA TABLA ORDEN
--- do $$
--- declare
---     i integer;
--- begin
---     i := 1;
---     loop
---         exit when i = 101;
---         insert into g29_orden(mercado, id_usuario, tipo, fecha_creacion, fecha_ejec, valor, cantidad, estado) VALUES
---         (G29_FN_MERCADO_RANDOM(),
---          G29_FN_USUARIO_RANDOM(),
---          G29_FN_TIPO_RANDOM(),
---          G29_FN_FECHAS_RANDOM('2000-01-01 00:00:00','2010-01-01 00:00:00'),
---          G29_FN_FECHAS_RANDOM('2010-01-01 00:00:00','2020-01-01 00:00:00'),
---          round(random()*1000),
---          round(random()*1000),
---          G29_FN_TIPO_RANDOM());   ---TODO: TIENE QUE SER ACTIVA O INACTIVA
---         i := i + 1;
---     end loop;
--- end;
--- $$ language plpgsql;
+--Funciones NECESARIAS PARA AUTO CARGAR ORDENES
+
+ CREATE OR REPLACE FUNCTION G29_FN_FECHAS_RANDOM(desde timestamp, hasta timestamp) returns timestamp as $$
+ BEGIN
+     RETURN desde + random() * (hasta - desde);
+ END;
+ $$ language plpgsql;
+
+ CREATE OR REPLACE FUNCTION G29_FN_MONEDA_RANDOM() returns varchar as $$
+ BEGIN
+     RETURN (SELECT nombre FROM g29_moneda OFFSET floor(random()*(SELECT count(*) FROM g29_moneda )) LIMIT 1);
+ END;
+ $$ language plpgsql;
+
+ CREATE OR REPLACE FUNCTION G29_FN_MERCADO_RANDOM() returns varchar as $$
+ BEGIN
+     RETURN (SELECT nombre FROM g29_mercado OFFSET floor(random()*(SELECT count(*) FROM g29_mercado )) LIMIT 1);
+ END;
+ $$ language plpgsql;
+
+ CREATE OR REPLACE FUNCTION G29_FN_USUARIO_RANDOM() returns int as $$
+ BEGIN
+     RETURN (SELECT id_usuario FROM g29_usuario OFFSET floor(random()*(SELECT count(*) FROM g29_usuario)) LIMIT 1);
+ END;
+ $$ language plpgsql;
+
+ CREATE OR REPLACE FUNCTION G29_FN_TIPO_RANDOM() returns varchar as $$
+ DECLARE
+     tipo varchar;
+ BEGIN
+     IF (SELECT ROUND(RANDOM() * 1) = 1) THEN
+         tipo = 'ACTIVA';
+     ELSE
+         tipo = 'INACTIVA';
+     END IF;
+     RETURN tipo;
+ END;
+ $$ language plpgsql;
+
+ --ESTE PROCEDIMIENTO CREA 100 FILAS EN LA TABLA ORDEN
+
+ do $$
+ declare
+     i integer;
+ begin
+     i := 1;
+     loop
+         exit when i = 101;
+         insert into g29_orden(mercado, id_usuario, tipo, fecha_creacion, fecha_ejec, valor, cantidad, estado) VALUES
+         (G29_FN_MERCADO_RANDOM(),
+          G29_FN_USUARIO_RANDOM(),
+          G29_FN_TIPO_RANDOM(),
+          G29_FN_FECHAS_RANDOM('2000-01-01 00:00:00','2010-01-01 00:00:00'),
+          G29_FN_FECHAS_RANDOM('2010-01-01 00:00:00','2020-01-01 00:00:00'),
+          round(random()*1000),
+          round(random()*1000),
+          G29_FN_TIPO_RANDOM());
+         i := i + 1;
+     end loop;
+ end;
+ $$ language plpgsql;
 
 -- FIN DE ORDEN
 -- TODO: AGREGAR BILLETERAS (CADA USUARIO TIENE UNA POR MONEDA, O SEA 20 BILLETERAS POR USUARIO)
 -- TODO : INSERTAR MOVIMIENTOS PARA HACER PRUEBAS
 
-INSERT INTO g29_billetera values (100,'USDT',1000);
-INSERT INTO g29_billetera values (101,'USDT',1000);
-INSERT INTO g29_billetera values (102,'USDT',1000);
--- INSERT INTO g29_billetera values (103,'USD',1000);
--- INSERT INTO g29_billetera values (104,'USD',1000);
--- INSERT INTO g29_billetera values (105,'USD',1000);
+
+-- INSERT INTO g29_billetera values (105,'USD',0);
 --
 --
 -- INSERT INTO g29_movimiento values (100,'USD','2000-01-01 00:00:00','s',0.5,100,200,2336784);
@@ -199,11 +232,7 @@ INSERT INTO g29_billetera values (102,'USDT',1000);
 -- INSERT INTO g29_movimiento values (102,'USD','2004-01-01 00:00:00','s',0.5, 100,2336784);
 -- INSERT INTO g29_movimiento values (103,'USD',current_date,'s',0.5, 200,2336784);
 -- INSERT INTO g29_movimiento values (104,'USD',current_date,'s',0.5,200,21,2336784);
---
---
--- INSERT INTO g29_movimiento values (105,'USD',current_date,'s',0.5, 100,2336784);
---
---
+
 
 INSERT INTO g29_orden values (123456,'Mercado 1',100,'COMPRA', current_date,NULL,10000, 20000,'ACTIVA');
 -- INSERT INTO g29_orden values (123457,'Mercado 1',100,'VENTA', current_date,NULL,10000, 2000,'ACTIVA');

@@ -9,16 +9,37 @@ VALUES  (55254,'Argentina',54),
         (5906,'Holanda',14);
 
 INSERT INTO "g29_usuario" (id_usuario,apellido,nombre,fecha_alta,estado,email,password,telefono,id_pais)
-VALUES (100,'Callahan','Adrian','05-06-2014','Nueva','aliquet.Phasellus@eratsemper.net','MTH66QRT1WM','1911981','55254'),
-       (101,'Reeves','Vanna','12-05-2016','Cumplida','Sed.id@Nam.co.uk','BWE88AID1TA','2370460','53168'),
-       (102,'Perry','Isabella','08-07-2017','Nueva','lectus@ligula.net','LQH23TGW8XM','158725','697869'),
-       (103,'Tyler','Amity','07-10-2019','Cumplida','massa.rutrum.magna@mollisDuis.net','YVO19CMH7HW','0173499','74294'),
-       (104,'Christian','Stone','12-09-2018','Nueva','urna@doloregestasrhoncus.com','LMQ44ZEV6AB','0130859','697869'),
-       (105,'Frederick','Cullen','02-10-2019','Nueva','risus.odio.auctor@Donecluctus.org','GUB93PBU4YC','0845642','31705'),
-       (106,'Olsen','Chava','09-07-2021','Cumplida','arcu@miAliquamgravida.org','WGM60BEY4LX','01124392','4656'),
-       (107,'Cannon','Lillian','09-10-2010','Nueva','sed.dui@posuerecubiliaCurae.com','COB09XRA7ZY','5548745','697869'),
-       (108,'Hawkins','Lacey','02-01-2011','Cumplida','fringilla@risus.org','LWY67QTY8YD','202477','55254'),
-       (109,'Howell','Magee','06-10-2019','Nueva','magnis.dis@massanon.edu','SIP15DCU4CL','671845','55254');
+VALUES (200,'Cahan','Aian','05-06-2014','Nueva','aliquet.Phalus@erasemper.net','MTH66T1WM','111981','55254'),
+       (201,'eeves','Vanna','12-05-2016','Cumplida','Sedid@Nam.co.uk','BWE8AID1TA','230460','53168'),
+       (202,'rry','Isabella','08-07-2017','Nueva','ltus@ligula.net','LQH2TGW8XM','15825','697869'),
+       (203,'Tyle','Amity','07-10-2019','Cumplida','massa.rum.magna@mollisDuis.net','YVO19MH7HW','017499','74294'),
+       (204,'Christ','Stone','12-09-2018','Nueva','urna@stasrhoncus.com','LMQ44ZV6AB','013059','697869'),
+       (205,'Frederk','Cullen','02-10-2019','Nueva','rius.odio.aucor@Donecluctus.org','GU93PBU4YC','084642','31705'),
+       (206,'Oln','Chava','09-07-2021','Cumplida','arcu@miAliquaravida.org','WGM60BE4LX','0112392','4656'),
+       (207,'Canon','Lillian','09-10-2010','Nueva','sed.dui@posecubiliaCurae.com','COB0XRA7ZY','554745','697869'),
+       (208,'Hains','Lacy','02-01-2011','Cumplida','fringil@risus.org','LWY67QT8YD','20277','55254'),
+       (209,'well','Mage','06-10-2019','Nueva','magnis.dis@msanon.edu','SIP15DU4CL','67145','55254');
+
+-- EL USUARIO DEBE TENER UNA BILLETERA POR CADA MONEDA EXISTENTE
+CREATE OR REPLACE FUNCTION TRFN_G29_Insert_Billetera()
+RETURNS TRIGGER AS
+$$
+DECLARE
+    reg RECORD;
+BEGIN
+    FOR reg IN (SELECT moneda FROM g29_moneda)
+    LOOP
+        INSERT INTO g29_billetera(id_usuario, moneda, saldo)
+        VALUES (new.id_usuario,reg.moneda,0);
+    END LOOP;
+    RETURN new;
+END
+ $$ LANGUAGE 'plpgsql';
+
+CREATE TRIGGER TR_G29_Insert_Billetera
+AFTER INSERT ON g29_usuario
+FOR EACH ROW
+EXECUTE PROCEDURE TRFN_G29_Insert_Billetera();
 
 
 
@@ -52,39 +73,26 @@ INSERT INTO "g29_moneda" (moneda,nombre,descripcion,alta,estado,fiat)
   ('ARS','Peso Argentino','none','03-02-2020','N','Y');
 
 
--- EL USUARIO DEBE TENER UNA BILLETERA POR CADA MONEDA EXISTENTE
-CREATE OR REPLACE FUNCTION G29_FN_Insertar_Nueva_Billetera() returns void as $$
-declare
-     i integer;
- begin
-     i := 1;
-     loop
-         exit when i = 101;
-         insert into g29_billetera(mercado, id_usuario, tipo, fecha_creacion, fecha_ejec, valor, cantidad, estado) VALUES
-
-         i := i + 1;
-     end loop;
- end;
- $$ language plpgsql;
-
-
-CREATE OR REPLACE FUNCTION TRFN_G29_Nueva_Billetera()
-RETURNS trigger AS
+CREATE OR REPLACE FUNCTION TRFN_G29_Insert_Moneda()
+RETURNS TRIGGER AS
 $$
+DECLARE
+    reg RECORD;
 BEGIN
-	IF (NOT EXISTS (SELECT 1
-			FROM g29_moneda m
-			WHERE m.moneda = NEW.moneda))
-    END IF;
-RETURN NEW;
+    FOR reg IN (SELECT id_usuario FROM g29_usuario)
+    LOOP
+        INSERT INTO g29_billetera(id_usuario, moneda, saldo)
+        VALUES (reg.id_usuario,new.moneda,0);
+    END LOOP;
+    RETURN new;
 END
-$$
-LANGUAGE plpgsql;
+ $$ LANGUAGE 'plpgsql';
 
-CREATE TRIGGER TR_G29_Nueva_Billetera
-BEFORE INSERT ON g29_moneda
+CREATE TRIGGER TR_G29_Insert_Moneda
+AFTER INSERT OR UPDATE ON g29_moneda
 FOR EACH ROW
-EXECUTE PROCEDURE G29_FN_Insertar_Nueva_Billetera();
+EXECUTE PROCEDURE TRFN_G29_Insert_Moneda();
+
 
 
 
@@ -244,9 +252,11 @@ INSERT INTO g29_orden values (123456,'Mercado 1',100,'COMPRA', current_date,NULL
 
 --LLAMADO A TABLAS
 --SELECT * FROM g29_pais;
---SELECT * FROM g29_usuario;
---SELECT * FROM g29_moneda;
+SELECT * FROM g29_usuario;
+SELECT * FROM g29_moneda;
 --SELECT  * FROM g29_mercado;
 --SELECT * FROM g29_orden;
+SELECT * FROM g29_billetera;
+
 
 

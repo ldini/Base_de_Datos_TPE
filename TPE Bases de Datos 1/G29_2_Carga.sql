@@ -1,4 +1,6 @@
+-- TODO = DEBE TENER POR LO MENOS 10 USUARIOS
 
+--Antes se necesita tener paises para asignar a cada usuario
 INSERT INTO "g29_pais" (id_pais, nombre, cod_telef)
 VALUES  (55254,'Argentina',54),
         (53168,'Uruguay',34),
@@ -20,29 +22,7 @@ VALUES (200,'Cahan','Aian','05-06-2014','Nueva','aliquet.Phalus@erasemper.net','
        (208,'Hains','Lacy','02-01-2011','Cumplida','fringil@risus.org','LWY67QT8YD','20277','55254'),
        (209,'well','Mage','06-10-2019','Nueva','magnis.dis@msanon.edu','SIP15DU4CL','67145','55254');
 
--- EL USUARIO DEBE TENER UNA BILLETERA POR CADA MONEDA EXISTENTE
-CREATE OR REPLACE FUNCTION TRFN_G29_Insert_Billetera()
-RETURNS TRIGGER AS
-$$
-DECLARE
-    reg RECORD;
-BEGIN
-    FOR reg IN (SELECT moneda FROM g29_moneda)
-    LOOP
-        INSERT INTO g29_billetera(id_usuario, moneda, saldo)
-        VALUES (new.id_usuario,reg.moneda,0);
-    END LOOP;
-    RETURN new;
-END
- $$ LANGUAGE 'plpgsql';
-
-CREATE TRIGGER TR_G29_Insert_Billetera
-AFTER INSERT ON g29_usuario
-FOR EACH ROW
-EXECUTE PROCEDURE TRFN_G29_Insert_Billetera();
-
-
-
+-- TODO = EL SITIO DEBE MANEJAR AL MENOS 20 MONEDAS
 
 INSERT INTO "g29_moneda" (moneda,nombre,descripcion,alta,estado,fiat)
  VALUES
@@ -73,6 +53,29 @@ INSERT INTO "g29_moneda" (moneda,nombre,descripcion,alta,estado,fiat)
   ('ARS','Peso Argentino','none','03-02-2020','N','Y');
 
 
+--EL USUARIO DEBE TENER UNA BILLETERA POR CADA MONEDA EXISTENTE
+
+CREATE OR REPLACE FUNCTION TRFN_G29_Insert_Billetera()
+RETURNS TRIGGER AS
+$$
+DECLARE
+    reg RECORD;
+BEGIN
+    FOR reg IN (SELECT moneda FROM g29_moneda)
+    LOOP
+        INSERT INTO g29_billetera(id_usuario, moneda, saldo)
+        VALUES (new.id_usuario,reg.moneda,0);
+    END LOOP;
+    RETURN new;
+END
+ $$ LANGUAGE 'plpgsql';
+
+CREATE TRIGGER TR_G29_Insert_Billetera
+AFTER INSERT ON g29_usuario
+FOR EACH ROW
+EXECUTE PROCEDURE TRFN_G29_Insert_Billetera();
+
+
 CREATE OR REPLACE FUNCTION TRFN_G29_Insert_Moneda()
 RETURNS TRIGGER AS
 $$
@@ -93,8 +96,7 @@ AFTER INSERT OR UPDATE ON g29_moneda
 FOR EACH ROW
 EXECUTE PROCEDURE TRFN_G29_Insert_Moneda();
 
-
-
+--TODO = CREAR UN MERCADO DE CADA MONEDA CONTRA LAS ESTABLES
 
 INSERT INTO "g29_mercado" (nombre,moneda_o,moneda_d,precio_mercado)
 VALUES ('Mercado 1','USDT','BTC',826047.54),
@@ -151,6 +153,9 @@ VALUES ('Mercado 41','CARBON','BTC',826047.54),
        ('Mercado 48','CARBON','MKR',	547.64),
        ('Mercado 49','CARBON','THETA',0.755019);
 
+
+--TODO = CREAR MERCADO DE CADA CRIPTOMONEDA CONTRA EL BTC
+
 INSERT INTO "g29_mercado" (nombre,moneda_o,moneda_d,precio_mercado)
 VALUES ('Mercado 51','BTC','BTC',826047.54),
        ('Mercado 52','BTC','ETH',297.15),
@@ -162,8 +167,9 @@ VALUES ('Mercado 51','BTC','BTC',826047.54),
        ('Mercado 58','BTC','MKR',	547.64),
        ('Mercado 59','BTC','THETA',0.755019);
 
+--TODO = INICIALIZAR LAS ORDENES CON AL MENOS 100 FILAS
 
-
+SELECT G29_FN_CREAR_ORDENES_RANDOM();
 
 --Funciones NECESARIAS PARA AUTO CARGAR ORDENES
 
@@ -206,14 +212,14 @@ VALUES ('Mercado 51','BTC','BTC',826047.54),
 
  --ESTE PROCEDIMIENTO CREA 100 FILAS EN LA TABLA ORDEN
 
- do $$
- declare
-     i integer;
- begin
+CREATE OR REPLACE FUNCTION G29_FN_CREAR_ORDENES_RANDOM() RETURNS VOID AS $$
+ DECLARE
+     i INTEGER;
+ BEGIN
      i := 1;
-     loop
-         exit when i = 101;
-         insert into g29_orden(mercado, id_usuario, tipo, fecha_creacion, fecha_ejec, valor, cantidad, estado) VALUES
+     LOOP
+         EXIT WHEN i = 101;
+         INSERT INTO g29_orden(mercado, id_usuario, tipo, fecha_creacion, fecha_ejec, valor, cantidad, estado) VALUES
          (G29_FN_MERCADO_RANDOM(),
           G29_FN_USUARIO_RANDOM(),
           G29_FN_TIPO_RANDOM(),
@@ -223,39 +229,31 @@ VALUES ('Mercado 51','BTC','BTC',826047.54),
           round(random()*1000),
           G29_FN_TIPO_RANDOM());
          i := i + 1;
-     end loop;
- end;
- $$ language plpgsql;
+     END LOOP;
+ END;
+ $$ LANGUAGE plpgsql;
 
 -- FIN DE ORDEN
--- TODO: AGREGAR BILLETERAS (CADA USUARIO TIENE UNA POR MONEDA, O SEA 20 BILLETERAS POR USUARIO)
--- TODO : INSERTAR MOVIMIENTOS PARA HACER PRUEBAS
+
+-- TODO : PRUEBAS!!
+
+-- INSERTAR MOVIMIENTOS PARA HACER PRUEBAS
 
 
--- INSERT INTO g29_billetera values (105,'USD',0);
 --
---
--- INSERT INTO g29_movimiento values (100,'USD','2000-01-01 00:00:00','s',0.5,100,200,2336784);
--- INSERT INTO g29_movimiento values (101,'USD','2003-01-01 00:00:00','s',0.5, 190,100,2336784);
--- INSERT INTO g29_movimiento values (102,'USD','2004-01-01 00:00:00','s',0.5, 100,2336784);
--- INSERT INTO g29_movimiento values (103,'USD',current_date,'s',0.5, 200,2336784);
--- INSERT INTO g29_movimiento values (104,'USD',current_date,'s',0.5,200,21,2336784);
-
-
-INSERT INTO g29_orden values (123456,'Mercado 1',100,'COMPRA', current_date,NULL,10000, 20000,'ACTIVA');
--- INSERT INTO g29_orden values (123457,'Mercado 1',100,'VENTA', current_date,NULL,10000, 2000,'ACTIVA');
--- INSERT INTO g29_orden values (123466,'Mercado 1',100,'VENTA', current_date,NULL,10000, 2000,'ACTIVA');
---
--- INSERT INTO g29_orden values (1234466,'Mercado 1',102,'VENTA', current_date,NULL,10000, 20000,'ACTIVA');
--- INSERT INTO g29_orden values (12344566,'Mercado 1',102,'COMPRA', current_date,NULL,10000, 20000,'ACTIVA');
-
+INSERT INTO g29_movimiento values (100,'USD','2000-01-01 00:00:00','s',0.5,100,200,2336784);
+INSERT INTO g29_movimiento values (101,'USD','2003-01-01 00:00:00','s',0.5, 190,100,2336784);
+INSERT INTO g29_movimiento values (102,'USD','2004-01-01 00:00:00','s',0.5, 100,2336784);
+INSERT INTO g29_movimiento values (103,'USD',current_date,'s',0.5, 200,2336784);
+INSERT INTO g29_movimiento values (104,'USD',current_date,'s',0.5,200,21,2336784);
+INSERT INTO g29_movimiento values (204,'USD',current_date,'s',0.5,200,22,2336734);
 
 --LLAMADO A TABLAS
---SELECT * FROM g29_pais;
+SELECT * FROM g29_pais;
 SELECT * FROM g29_usuario;
 SELECT * FROM g29_moneda;
---SELECT  * FROM g29_mercado;
---SELECT * FROM g29_orden;
+SELECT * FROM g29_mercado;
+SELECT * FROM g29_orden;
 SELECT * FROM g29_billetera;
 
 

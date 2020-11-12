@@ -377,15 +377,31 @@ END
 
 
 ---D) DEFINICION DE VISTAS
---1.
-CREATE OR REPLACE  VIEW SALDO_MONEDA AS
-    SELECT b.id_usuario, b.moneda, b.saldo
-    FROM g29_billetera b;
 
+--1.
+CREATE OR REPLACE VIEW G29_saldo_usuario_por_moneda AS
+    SELECT id_usuario, moneda, saldo
+    FROM g29_billetera b
+    ORDER BY id_usuario;
 ----
 --2.
--- CREATE OR REPLACE VIEW SALDO_COTIZACION AS
---     SELECT
---     FROM g29_billetera b JOIN g29_moneda m on b.moneda = m.moneda
---         JOIN g29_mercado mer on m.moneda = mer.moneda_d
---     WHERE ()
+
+CREATE OR REPLACE FUNCTION FN_G29_COTIZACION_MONEDA(origen varchar, destino varchar, saldo float) returns float as $$
+ BEGIN
+     RETURN (SELECT (saldo/precio_mercado) AS cot FROM g29_mercado WHERE moneda_o = destino AND moneda_d = origen);
+ END;
+ $$ language plpgsql;
+
+CREATE OR REPLACE VIEW G29_saldo_cotizado AS -- Si hay nulos es por que no hay mercado para ese par de monedas
+    SELECT id_usuario, moneda, saldo ,FN_G29_COTIZACION_MONEDA(moneda, 'BTC',saldo) as cot_BTC, FN_G29_COTIZACION_MONEDA(moneda,'USDT',saldo) as cot_USDT FROM G29_saldo_usuario_por_moneda;
+
+----
+--3
+
+CREATE OR REPLACE VIEW G29_usuarios_con_mas_dinero AS -- COMO EN LA ANTERIOR VISTA SE COTIZAN TODAS LAS MONEDAS, SE SUMA UNA DE LAS COTIZACIONES PARA DETERMINAR QUIEN TIENE MAS DINERO
+    SELECT id_usuario, sum(cot_BTC) as saldo_total FROM G29_saldo_cotizado
+    GROUP BY id_usuario
+    ORDER BY saldo_total DESC
+    LIMIT 10;
+
+

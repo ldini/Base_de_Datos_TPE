@@ -39,22 +39,40 @@ ALTER TABLE G29_Mercado
     DROP CONSTRAINT FK_G29_mercado_moneda_o;
 
 -- tables
-DROP TABLE G29_Billetera;
-
+DROP TABLE G29_Billetera CASCADE;
 DROP TABLE G29_ComposicionOrden;
-
-DROP TABLE G29_Mercado;
-
-DROP TABLE G29_Moneda;
-
+DROP TABLE G29_Mercado CASCADE;
+DROP TABLE G29_Moneda CASCADE;
 DROP TABLE G29_Movimiento;
-
 DROP TABLE G29_Orden;
-
-DROP TABLE G29_Pais;
-
+DROP TABLE G29_Pais CASCADE;
 DROP TABLE G29_RelMoneda;
-
 DROP TABLE G29_Usuario;
+
+---funciones
+
+DROP FUNCTION IF EXISTS trfn_g29_movimientosbloquesconsecutivos();
+DROP FUNCTION IF EXISTS fn_g29_listarordenes(mercadop varchar, fecha date) cascade;
+DROP FUNCTION IF EXISTS trfn_g29_ejecutarordenmarket();
+DROP FUNCTION IF EXISTS trfn_g29_ordensaldosuficiente();
+DROP FUNCTION IF EXISTS trfn_g29_retirofondossuficientes();
+DROP FUNCTION IF EXISTS trfn_g29_calcular20porciento();
+DROP FUNCTION IF EXISTS fn_g29_preciomercado(mercadoo varchar, compra double precision, venta double precision);
+DROP FUNCTION IF EXISTS G29_FN_FECHAS_RANDOM();
+DROP FUNCTION IF EXISTS G29_FN_MONEDA_RANDOM();
+DROP FUNCTION IF EXISTS G29_FN_MERCADO_RANDOM();
+DROP FUNCTION IF EXISTS G29_FN_USUARIO_RANDOM();
+DROP FUNCTION IF EXISTS G29_FN_TIPO_RANDOM();
+DROP FUNCTION IF EXISTS G29_FN_CREAR_ORDENES_RANDOM();
+
+
+--FUNCIONES TRIGGER Y TRIGGERS
+
+DROP FUNCTION IF EXISTS TRFN_G29_Insert_Billetera() CASCADE;
+DROP TRIGGER IF EXISTS TR_G29_Insert_Billetera ON g29_moneda;
+
+DROP FUNCTION IF EXISTS TRFN_G29_Insert_Moneda() CASCADE; -- cascade por que tr_g29_insert_moneda en la tabla g29_moneda depende de esta funcion
+DROP TRIGGER IF EXISTS TR_G29_Insert_Moneda ON g29_usuario;
+
 
 -- End of file.

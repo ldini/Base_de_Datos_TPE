@@ -1,5 +1,9 @@
+--TODO ERROR EN CK_G29 LINEA 123
+
 -- Restricciones y Reglas del Negocio
 
+
+--TODO HACER SENTENCIAS DE ACTIVACION COMENTADAS
 --1) Controlar que los numeros de bloque sean consecutivos para los movimientos de Entrada y Salida del Blockchain por moneda y fecha
 CREATE OR REPLACE FUNCTION TRFN_G29_MovimientosBloquesConsecutivos()
 RETURNS trigger AS
@@ -20,22 +24,40 @@ CREATE TRIGGER TR_G29_Movimiento_MovimientosBloquesConsecutivos
 BEFORE INSERT ON g29_movimiento
 FOR EACH ROW
 EXECUTE PROCEDURE TRFN_G29_MovimientosBloquesConsecutivos();
+--Sentencias de activacion
+-- insert into g29_movimiento values (100,'USDT','2018-01-01 00:00:00','e',0,50,50,'A2020'); -- este seria el ultimo movimiento
+-- insert into g29_movimiento values (100,'USDT',current_date,'e',0,1000,49,'A2020'); -- no procede por ser el bloque menor
+-- insert into g29_movimiento values (100,'USDT',current_date,'e',0,1000,51,'A2020'); -- procede
 
 
+--************************************************************
 --2) Controlar que no se pueda colocar una orden si no hay fondos suficientes.
 
 CREATE OR REPLACE FUNCTION TRFN_G29_OrdenSaldoSuficiente()
 RETURNS trigger AS
 $$
 BEGIN
-
+    IF(new.tipo = 'COMPRA') THEN
         IF (EXISTS(SELECT 1
 			FROM g29_billetera b
-            JOIN g29_mercado m ON m.nombre = NEW.mercado
-            WHERE (b.moneda = m.moneda_o) AND (b.saldo < NEW.valor)))THEN   --TODO Consultar sobre moneda_o o moneda_d
-
-             RAISE EXCEPTION 'No hay fondos suficientes para realizar la orden';
+            WHERE (b.id_usuario = NEW.id_usuario) AND(b.moneda = (SELECT m.moneda_d
+                                                                  FROM g29_mercado m
+                                                                  WHERE m.nombre = NEW.mercado))
+              AND (b.saldo < NEW.valor * NEW.cantidad)))THEN   --TODO Consultar sobre moneda_o o moneda_d
+                RAISE EXCEPTION 'No hay fondos suficientes para realizar la orden';
         END IF;
+    ELSE
+        IF(new.tipo = 'VENTA') THEN
+            IF (EXISTS(SELECT 1
+			FROM g29_billetera b
+            WHERE (b.id_usuario = NEW.id_usuario) AND (b.moneda = (SELECT m.moneda_o
+                                                                  FROM g29_mercado m
+                                                                  WHERE m.nombre = NEW.mercado))
+              AND (b.saldo < NEW.cantidad)))THEN
+                RAISE EXCEPTION 'No hay fondos suficientes para realizar la orden';
+            END IF;
+        END IF;
+    END IF;
 RETURN NEW;
 END
 $$
@@ -46,6 +68,16 @@ BEFORE INSERT ON g29_orden
 FOR EACH ROW
 EXECUTE PROCEDURE TRFN_G29_OrdenSaldoSuficiente();
 
+--Sentencias de prueba
+
+-- insert into g29_usuario values (9999,'Juan','Perez','05-06-2014', 'none', 'none', 'password', '442543353', '55254'); -- se crea un usuario
+-- update g29_billetera set saldo = 1000
+--     where id_usuario = 9999 and moneda = 'USDT';  --se carga el saldo de la billetera del usuario en 1000 USDT
+-- insert into g29_orden values (9999996554889,'Mercado 1', 9999,'COMPRA', current_date, null, 11000, 1, 'ACTIVA'); --no procede, la cantidad *valor supera el saldo en la billetera
+-- insert into g29_orden values (99999939989,'Mercado 1', 9999,'COMPRA', current_date, null, 11000, 0.01, 'ACTIVA'); --procede
+
+
+--************************************************************
 --3) No se pueden hacer retiros de una moneda, si esos fondos estan en ordenes activas.
 CREATE OR REPLACE FUNCTION TRFN_G29_RetiroFondosSuficientes()
 RETURNS trigger AS
@@ -61,7 +93,7 @@ BEGIN
             OR EXISTS(SELECT 1
 			FROM g29_billetera b
             WHERE ((NEW.id_usuario = b.id_usuario) AND (NEW.moneda = b.moneda)
-                       AND (b.saldo < (NEW.valor +(SELECT sum(o.valor)
+                       AND (b.saldo < (NEW.valor +(SELECT sum(o.valor *o.cantidad )
                                                     FROM  g29_orden o
                                                     JOIN g29_mercado m on o.mercado = m.nombre
                                                      WHERE ((m.moneda_d = NEW.moneda) AND (o.estado = 'ACTIVA') AND (o.tipo = 'COMPRA') AND (o.id_usuario = NEW.id_usuario)))))))
@@ -81,12 +113,26 @@ FOR EACH ROW
 WHEN (NEW.tipo = 's')
 EXECUTE PROCEDURE TRFN_G29_RetiroFondosSuficientes();
 
+--Sentencias de prueba
+--teniendo en cuenta la orden creada (la que procede) en las sentencia de prueba anterior:
 
+-- insert into g29_movimiento values (9999,'USDT',current_date,'s', 0, 1000, 900, 'B348738'); -- No procede, el saldo en su billetera es 1000, pero tiene una orden de compra que se "resta" a este saldo.
+-- insert into g29_movimiento values (9999,'USDT',current_date,'s', 0, 50, 900, 'B348738'); --Procede
+
+
+--************************************************************
 -- 4) La opcionalidad del numero de bloque en Movimiento, debe coincidir con la opcionalidad de Direccion, es decir que ambos son nulos o ambos no lo son.
+
 ALTER TABLE g29_movimiento
 ADD CONSTRAINT CK_G29_Movimiento_BloqueDireccionNulidad
 CHECK ( NOT ((( bloque IS NULL) AND (direccion IS NOT NULL)) OR (( bloque IS NOT NULL) AND (direccion IS NULL))));
 
+--Sentencias de prueba
+
+-- insert into g29_movimiento values (9999,'USDT','12-05-2021','e', 0, 1000, null, 'A59393'); --No procede
+-- insert into g29_movimiento values (9999,'USDT','12-06-2021','e', 0, 1000, 901, null); --No procede
+-- insert into g29_movimiento values (9999,'USDT','12-05-2022','e', 0, 1000, null, null); -- Procede
+-- insert into g29_movimiento values (9999,'USDT','12-05-2023','e', 0, 1000, 901, 'A477389'); -- Procede
 
 
 --SERVICIOS
@@ -163,6 +209,13 @@ declare
 
 end; $$ language plpgsql;
 
+--Sentencias de prueba
+-- insert into g29_orden values (9999999998,'Mercado 1', 9999, 'VENTA', current_date, null, 12000, 0.01, 'ACTIVA');
+-- select precio_mercado
+-- from g29_mercado
+-- where nombre = 'Mercado 1';
+
+--************************************************************
 --B) Ejecute una orden de mercado (orden de tipo Market) para compra y venta
 
 create or replace function TRFN_G29_EjecutarOrdenMarket() returns trigger as $$
@@ -294,6 +347,14 @@ create trigger TR_G29_Orden_EjecutarOrdenMarket after insert or update of estado
     when (new.estado = 'EJECUTADA')
     execute function TRFN_G29_EjecutarOrdenMarket();
 
+--Sentencias de prueba
+--Para chequear este servicio se tiene que cambiar el valor de una orden de compra o venta por 'EJECUTADA', Y despues controlar las ordenes que queden y las billeteras de los usuarios.
+-- update g29_billetera set saldo = 0.51  -- (tiene 0.01 en otra orden de venta creada en la sentencia anterior)
+-- where id_usuario = 9999 and moneda = 'BTC';
+-- insert into g29_orden values (999997999999995, 'Mercado 1', 9999, 'VENTA', current_date, current_date, 10000, 0.5, 'ACTIVA');
+
+
+--************************************************************
 --C) Dado un mercado X y una fecha, retome un listado con todas las ordenes ordenadas en forma cronologica junto con su tipo y estado
 create or replace function FN_G29_ListarOrdenes(mercadop varchar(20), fecha date)
 RETURNS TABLE( out_id integer, out_tipo varchar(10), out_estado varchar(10), out_fecha date) AS
@@ -313,3 +374,18 @@ BEGIN
     RETURN;
 END
  $$ LANGUAGE 'plpgsql';
+
+
+---D) DEFINICION DE VISTAS
+--1.
+CREATE OR REPLACE  VIEW SALDO_MONEDA AS
+    SELECT b.id_usuario, b.moneda, b.saldo
+    FROM g29_billetera b;
+
+----
+--2.
+-- CREATE OR REPLACE VIEW SALDO_COTIZACION AS
+--     SELECT
+--     FROM g29_billetera b JOIN g29_moneda m on b.moneda = m.moneda
+--         JOIN g29_mercado mer on m.moneda = mer.moneda_d
+--     WHERE ()
